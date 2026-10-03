@@ -1,0 +1,222 @@
+{% extends "main.html" %}
+{% load static sp_tags %}
+
+{% block title %}Hasil Diagnosis {{ r.nama_anak }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <nav aria-label="breadcrumb" class="no-print">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'riwayat_list' %}">Riwayat</a></li>
+                    {% if r.anak_id %}<li class="breadcrumb-item"><a href="{% url 'anak_detail' r.anak_id %}">{{ r.anak.nama }}</a></li>{% endif %}
+                    <li class="breadcrumb-item active" aria-current="page">Hasil diagnosis</li>
+                </ol>
+            </nav>
+            <h1>Hasil Diagnosis {{ r.nama_anak }}</h1>
+            <p class="lead">
+                {{ r.tanggal|date:"l, j F Y" }}
+                {% if r.usia %}&middot; usia {{ r.usia }}{% endif %}
+                {% if r.anak.kelompok %}&middot; {{ r.anak.get_kelompok_display }}{% endif %}
+                {% if r.pemeriksa %}&middot; diamati oleh {{ r.pemeriksa.get_full_name|default:r.pemeriksa.username }}{% endif %}
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2 no-print">
+            <a href="{% url 'riwayat_pdf' r.pk %}" class="btn btn-primary"><i class="bi bi-file-earmark-pdf me-1"></i> Unduh PDF</a>
+            <button type="button" class="btn btn-soft" onclick="window.print()"><i class="bi bi-printer me-1"></i> Cetak</button>
+            {% if r.anak_id %}
+            <a href="{% url 'diagnosis' %}?anak={{ r.anak_id }}" class="btn btn-soft"><i class="bi bi-arrow-repeat me-1"></i> Diagnosis ulang</a>
+            <a href="{% url 'anak_detail' r.anak_id %}" class="btn btn-soft"><i class="bi bi-graph-up me-1"></i> Perkembangan anak</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Kesimpulan -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="kesimpulan-box {{ kesimpulan.kelas }}">
+                <div class="small-caps"><i class="bi {{ kesimpulan.ikon }} me-1"></i>Kesimpulan sistem pakar &middot; aturan {{ kesimpulan.kode }}</div>
+                <h2>{{ kesimpulan.label }}</h2>
+                <p>{{ kesimpulan.saran }}</p>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card-sp stat-tile">
+                <div class="label">Rata-rata capaian</div>
+                <div class="hero-number mt-2">{{ rata_rata|persen }}</div>
+                <div class="note mt-2">
+                    {{ jumlah_terpenuhi }} dari {{ jumlah_indikator }} kemampuan tercapai
+                    {% if selisih_rata is not None %}
+                    <br><span class="delta {{ selisih_rata|arah }}"><i class="bi {% if selisih_rata > 0 %}bi-arrow-up-right{% elif selisih_rata < 0 %}bi-arrow-down-right{% else %}bi-dash{% endif %}"></i>{{ selisih_rata|selisih }} poin</span>
+                    dibanding {{ grafik.tanggal_sebelumnya }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grafik -->
+    <div class="card-sp mb-4">
+        <div class="card-head">
+            <div>
+                <h2>Capaian per domain perkembangan</h2>
+                <p>Persentase indikator yang terpenuhi{% if sebelumnya %}, dibandingkan diagnosis {{ grafik.tanggal_sebelumnya }}{% endif %}</p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                {% if sebelumnya %}
+                <div class="legend-sp">
+                    <span><i class="sw" style="background:#2a78d6"></i>Sekarang</span>
+                    <span><i class="sw" style="background:#b7d3f6"></i>Sebelumnya</span>
+                </div>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-light btn-tabel no-print" data-toggle-tabel="tabel-hasil" data-grafik="wadah-grafik-hasil" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="chart-box" id="wadah-grafik-hasil" style="height: {% if sebelumnya %}360{% else %}300{% endif %}px"><canvas id="grafik-hasil" role="img" aria-label="Grafik capaian per domain"></canvas></div>
+            <div class="tabel-data table-responsive" id="tabel-hasil">
+                <table class="table table-sp">
+                    <thead><tr><th>Domain</th><th class="center">Indikator terpenuhi</th><th class="num">Capaian</th>{% if sebelumnya %}<th class="num">Sebelumnya</th><th class="num">Selisih</th>{% endif %}<th>Status</th><th>Aturan</th></tr></thead>
+                    <tbody>
+                    {% for h in hasil %}
+                    <tr>
+                        <td class="fw-semibold">{{ h.domain }}</td>
+                        <td class="center tabular">{{ h.terpenuhi }} / {{ h.total }}</td>
+                        <td class="num">{{ h.persen|persen }}</td>
+                        {% if sebelumnya %}<td class="num">{{ grafik.sebelumnya|ambil:forloop.counter0|persen }}</td><td class="num"><span class="delta {{ h.selisih|arah }}">{{ h.selisih|selisih|default:"-" }}</span></td>{% endif %}
+                        <td><span class="badge-st {{ h.info.kelas }}"><i class="bi {{ h.status|status_ikon }}"></i>{{ h.info.label }}</span></td>
+                        <td>{% if h.aturan %}<span class="rule-code">{{ h.aturan }}</span>{% else %}-{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rincian per domain -->
+    <h2 class="h5 mb-3">Rincian dan rekomendasi stimulasi</h2>
+    <div class="row g-3 mb-4">
+        {% for h in hasil %}
+        <div class="col-md-6">
+            <div class="card-sp domain-hasil">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <h3 class="h6 mb-1">{{ h.domain }}</h3>
+                            <span class="badge-st {{ h.info.kelas }}"><i class="bi {{ h.status|status_ikon }}"></i>{{ h.info.label }}</span>
+                        </div>
+                        <div class="text-end">
+                            <div class="persen">{{ h.persen|persen }}</div>
+                            {% if h.selisih is not None %}<span class="delta {{ h.selisih|arah }}">{{ h.selisih|selisih }} poin</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="meter {{ h.info.kelas }} my-3"><span style="width: {{ h.persen|stringformat:'.1f' }}%"></span></div>
+
+                    {% if h.indikator_terpenuhi or h.indikator_belum %}
+                    <ul class="cek-list mb-3">
+                        {% for x in h.indikator_terpenuhi %}<li class="ya"><i class="bi bi-check-circle-fill"></i>{{ x }}</li>{% endfor %}
+                        {% for x in h.indikator_belum %}<li class="tidak"><i class="bi bi-circle"></i><span>{{ x }} <span class="text-muted small">(belum tampak)</span></span></li>{% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="small text-muted">{{ h.terpenuhi }} dari {{ h.total }} indikator terpenuhi.</p>
+                    {% endif %}
+
+                    {% if h.rekomendasi %}
+                    <div class="rekom">
+                        <b><i class="bi bi-lightbulb me-1 text-warning"></i>{% if h.status == 'sesuai' %}Kegiatan pengayaan{% else %}Saran stimulasi{% endif %}</b>
+                        <ul>{% for x in h.rekomendasi %}<li>{{ x }}</li>{% endfor %}</ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if r.catatan %}
+    <div class="card-sp mb-4">
+        <div class="card-body"><div class="small-caps mb-1"><i class="bi bi-journal-text me-1"></i>Catatan guru</div>{{ r.catatan|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Jejak penalaran -->
+    <div class="card-sp mb-4">
+        <div class="card-head">
+            <div><h2><i class="bi bi-diagram-3 me-2 text-primary"></i>Jejak penalaran forward chaining</h2><p>Urutan aturan yang terpicu sehingga sistem sampai pada kesimpulan di atas.</p></div>
+            <button class="btn btn-sm btn-soft no-print" type="button" data-bs-toggle="collapse" data-bs-target="#jejak" aria-expanded="false" aria-controls="jejak">Tampilkan / sembunyikan</button>
+        </div>
+        <div class="collapse" id="jejak">
+            <div class="card-body">
+                {% if jejak_tahap %}
+                <h3 class="h6">Fakta awal (kemampuan yang dipilih: {{ fakta|length }})</h3>
+                <div class="mb-3">
+                    {% for f in fakta %}<span class="chip"><b>{{ f.kode }}</b>{{ f.deskripsi }}</span>{% empty %}<span class="text-muted small">Tidak ada kemampuan yang dipilih.</span>{% endfor %}
+                </div>
+                {% for judul, langkah in jejak_tahap %}
+                <h3 class="h6 mt-3">{{ judul }}</h3>
+                <div class="table-responsive">
+                    <table class="table table-sp table-sm">
+                        <thead><tr><th>#</th><th>Aturan</th><th>Kondisi (JIKA)</th><th>Kesimpulan (MAKA)</th><th>Fakta baru</th></tr></thead>
+                        <tbody>
+                        {% for j in langkah %}
+                        <tr>
+                            <td class="text-muted tabular">{{ j.langkah }}</td>
+                            <td><span class="rule-code">{{ j.aturan }}</span></td>
+                            <td><span class="kw">JIKA</span> {{ j.jika }}</td>
+                            <td><span class="kw">MAKA</span> {{ j.maka }}</td>
+                            <td class="small text-muted">{{ j.fakta_baru }}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-muted mb-0">Riwayat ini dibuat dengan versi program sebelumnya sehingga jejak penalarannya tidak tersimpan.
+                Status tiap domain tetap mengikuti aturan yang sama (lihat <a href="{% url 'basis_pengetahuan' %}">basis pengetahuan</a>).</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between flex-wrap gap-2 no-print">
+        <a href="{% url 'riwayat_list' %}" class="btn btn-light"><i class="bi bi-arrow-left me-1"></i> Kembali ke riwayat</a>
+        <a href="{% url 'riwayat_hapus' r.pk %}" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i> Hapus riwayat ini</a>
+    </div>
+</div>
+{{ grafik|json_script:"data-grafik" }}
+{% endblock %}
+
+{% block chart_js %}
+{% include "partials/chartjs.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    if (!window.Chart) return;
+    var g = SP.data("data-grafik");
+    var datasets = [];
+    if (g.sebelumnya) {
+        datasets.push(Object.assign({ label: "Sebelumnya (" + g.tanggal_sebelumnya + ")", data: g.sebelumnya }, SP.batang("#b7d3f6")));
+    }
+    datasets.unshift(Object.assign({ label: "Sekarang", data: g.sekarang }, SP.batang(SP.warnaDomain[0])));
+    new Chart(document.getElementById("grafik-hasil"), {
+        type: "bar",
+        data: { labels: g.label, datasets: datasets },
+        options: {
+            indexAxis: "y",
+            layout: { padding: { right: 48 } },
+            scales: { x: SP.skalaPersen(), y: SP.skalaKategori() },
+            plugins: {
+                labelUjung: { aktif: true, hanya: 0 },
+                tooltip: { callbacks: { label: function (c) { return c.dataset.label + ": " + SP.persen(c.raw); } } },
+            },
+        },
+        plugins: [SP.labelUjung],
+    });
+})();
+</script>
+{% endblock %}

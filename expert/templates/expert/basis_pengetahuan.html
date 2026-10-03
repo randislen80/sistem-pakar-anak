@@ -1,0 +1,156 @@
+{% extends "main.html" %}
+{% load sp_tags %}
+
+{% block title %}Basis Pengetahuan{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <h1>Basis Pengetahuan &amp; Aturan</h1>
+            <p class="lead">{{ basis|length }} domain perkembangan, {{ jumlah_indikator }} indikator, dan {{ jumlah_aturan }} aturan yang dipakai mesin inferensi forward chaining.</p>
+        </div>
+        {% if user.is_staff %}<a href="{% url 'admin:expert_domainperkembangan_changelist' %}" class="btn btn-soft"><i class="bi bi-pencil-square me-1"></i> Ubah di Admin</a>{% endif %}
+    </div>
+
+    <!-- Alur -->
+    <div class="card-sp mb-4">
+        <div class="card-head"><div><h2>Alur penalaran forward chaining</h2><p>Penalaran berjalan maju dari fakta menuju kesimpulan. Fakta baru dari satu tahap menjadi dasar tahap berikutnya.</p></div></div>
+        <div class="card-body">
+            <div class="alur">
+                <div class="tahap"><span class="rule-code">Fakta</span><h3>Fakta awal</h3><p>Indikator kemampuan yang dicentang guru saat pengamatan (G01, G02, ...).</p></div>
+                <div class="tahap"><span class="rule-code">R01 - R{{ aturan_status|length|stringformat:"02d" }}</span><h3>Tahap 1: status domain</h3><p>Jumlah indikator terpenuhi pada tiap domain menentukan statusnya.</p></div>
+                <div class="tahap"><span class="rule-code">K01 - K04</span><h3>Tahap 2: kesimpulan</h3><p>Status seluruh domain disimpulkan menjadi satu kesimpulan umum.</p></div>
+                <div class="tahap"><span class="rule-code">S01 - S{{ aturan_rekomendasi|length|stringformat:"02d" }}</span><h3>Tahap 3: rekomendasi</h3><p>Status tiap domain menurunkan saran stimulasi yang sesuai.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Domain & indikator -->
+        <div class="col-lg-7">
+            <div class="card-sp h-100">
+                <div class="card-head"><div><h2>Domain dan indikator (fakta)</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table table-sp table-sm">
+                        <thead><tr><th>Kode</th><th>Indikator</th></tr></thead>
+                        <tbody>
+                        {% for d in basis %}
+                        <tr class="table-light"><td><span class="rule-code">{{ d.kode }}</span></td><td class="fw-bold">{{ d.nama }}</td></tr>
+                        {% for i in d.indikator %}
+                        <tr><td class="ps-4"><span class="text-muted fw-semibold small">{{ i.kode }}</span></td><td>{{ i.deskripsi }}</td></tr>
+                        {% endfor %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Status -->
+        <div class="col-lg-5">
+            <div class="card-sp mb-3">
+                <div class="card-head"><div><h2>Status domain</h2><p>Berdasarkan persentase indikator yang terpenuhi</p></div></div>
+                <ul class="list-mini">
+                    {% for s in status_info %}
+                    <li>
+                        <span class="badge-st {{ s.kelas }}" style="min-width:140px"><i class="bi {{ s.ikon }}"></i>{{ s.label }}</span>
+                        <div class="grow small"><b>{{ s.syarat }}</b><div class="meta">{{ s.keterangan }}</div></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card-sp">
+                <div class="card-head"><div><h2>Kesimpulan umum</h2></div></div>
+                <ul class="list-mini">
+                    {% for k in kesimpulan_info %}
+                    <li>
+                        <span class="rule-code">{{ k.kode }}</span>
+                        <div class="grow small"><span class="badge-st {{ k.kelas }} mb-1">{{ k.label }}</span><div class="meta">JIKA {{ k.jika }}</div></div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aturan tahap 1 -->
+    <div class="card-sp mb-4">
+        <div class="card-head"><div><h2>Aturan tahap 1 - status domain</h2><p>Dibangkitkan otomatis dari basis pengetahuan sehingga ikut berubah bila indikator ditambah atau dikurangi.</p></div></div>
+        <div class="table-responsive">
+            <table class="table table-sp table-sm">
+                <thead><tr><th>Aturan</th><th>JIKA</th><th>MAKA</th></tr></thead>
+                <tbody>
+                {% for a in aturan_status %}
+                <tr {% if not a.berlaku %}class="text-muted"{% endif %}>
+                    <td><span class="rule-code">{{ a.kode }}</span></td>
+                    <td><span class="kw">JIKA</span> {{ a.jika }}</td>
+                    <td><span class="kw">MAKA</span> {{ a.maka }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Aturan tahap 2 & 3 -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card-sp h-100">
+                <div class="card-head"><div><h2>Aturan tahap 2 - kesimpulan</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table table-sp table-sm">
+                        <thead><tr><th>Aturan</th><th>JIKA</th><th>MAKA</th></tr></thead>
+                        <tbody>
+                        {% for a in aturan_kesimpulan %}
+                        <tr><td><span class="rule-code">{{ a.kode }}</span></td><td>{{ a.jika }}</td><td>{{ a.maka }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card-sp h-100">
+                <div class="card-head"><div><h2>Aturan tahap 3 - rekomendasi</h2></div></div>
+                <div class="table-responsive">
+                    <table class="table table-sp table-sm">
+                        <thead><tr><th>Aturan</th><th>JIKA</th><th>MAKA</th></tr></thead>
+                        <tbody>
+                        {% for a in aturan_rekomendasi %}
+                        <tr><td><span class="rule-code">{{ a.kode }}</span></td><td>{{ a.jika }}</td><td>{{ a.maka }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rekomendasi -->
+    <div class="card-sp mb-4">
+        <div class="card-head"><div><h2>Rekomendasi stimulasi</h2><p>Saran kegiatan yang diberikan menurut domain dan status</p></div></div>
+        <div class="accordion accordion-flush" id="akordion-rekom">
+            {% for d in basis %}
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#rekom-{{ forloop.counter }}" aria-expanded="false" aria-controls="rekom-{{ forloop.counter }}">
+                        {{ d.nama }}
+                    </button>
+                </h3>
+                <div id="rekom-{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#akordion-rekom">
+                    <div class="accordion-body">
+                        <ul class="mb-0">
+                        {% for r in rekomendasi|ambil:d.nama %}
+                            <li class="mb-1">{{ r.teks }} <span class="text-muted small">({% if r.status %}untuk status {{ r.status|status_label }}{% else %}untuk status yang belum Sesuai{% endif %})</span></li>
+                        {% empty %}
+                            <li class="text-muted">Belum ada rekomendasi.</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

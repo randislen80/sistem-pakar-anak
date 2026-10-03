@@ -1,0 +1,97 @@
+{% extends "main.html" %}
+{% load sp_tags %}
+
+{% block title %}Data Anak{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <h1>Data Anak</h1>
+            <p class="lead">Klik nama anak untuk melihat grafik dan statistik perkembangannya.</p>
+        </div>
+        <a href="{% url 'anak_tambah' %}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i> Tambah anak</a>
+    </div>
+
+    <div class="card-sp mb-3">
+        <div class="card-body">
+            <form method="get" class="filter-bar">
+                <div class="flex-grow-1">
+                    <label class="form-label" for="q">Cari</label>
+                    <input type="search" class="form-control" id="q" name="q" value="{{ q }}" placeholder="Nama anak, nomor induk, atau orang tua">
+                </div>
+                <div>
+                    <label class="form-label" for="kelompok">Kelompok</label>
+                    <select class="form-select" id="kelompok" name="kelompok">
+                        <option value="">Semua</option>
+                        {% for kode, label in pilihan_kelompok %}<option value="{{ kode }}" {% if kelompok == kode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="status">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="aktif" {% if status == 'aktif' %}selected{% endif %}>Aktif</option>
+                        <option value="nonaktif" {% if status == 'nonaktif' %}selected{% endif %}>Tidak aktif</option>
+                        <option value="semua" {% if status == 'semua' %}selected{% endif %}>Semua</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Terapkan</button>
+                    <a class="btn btn-light" href="{% url 'anak_list' %}">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card-sp">
+        <div class="table-responsive">
+            <table class="table table-sp">
+                <thead>
+                    <tr><th>Nama anak</th><th>Usia</th><th>Kelompok</th><th class="center">Diagnosis</th><th>Capaian terakhir</th><th>Kesimpulan terakhir</th><th class="text-end">Aksi</th></tr>
+                </thead>
+                <tbody>
+                {% for a in halaman %}
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="avatar {% if a.jenis_kelamin == 'P' %}p{% endif %}">{{ a.inisial }}</span>
+                            <div>
+                                <a class="fw-semibold" href="{% url 'anak_detail' a.pk %}">{{ a.nama }}</a>
+                                <div class="small text-muted">{{ a.get_jenis_kelamin_display|default:"-" }}{% if not a.aktif %} &middot; tidak aktif{% endif %}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="text-nowrap">{{ a.usia_teks }}</td>
+                    <td>{{ a.kelompok|default:"-" }}</td>
+                    <td class="center tabular">{{ a.jumlah }}</td>
+                    <td>
+                        {% if a.rata_terakhir is not None %}
+                        <div class="meter-inline"><div class="meter"><span style="width: {{ a.rata_terakhir|stringformat:'.1f' }}%"></span></div><b>{{ a.rata_terakhir|persen }}</b></div>
+                        <div class="small text-muted">{{ a.terakhir|date:"j M Y" }}</div>
+                        {% else %}<span class="text-muted small">Belum didiagnosis</span>{% endif %}
+                    </td>
+                    <td>{% if a.kesimpulan_terakhir %}<span class="badge-st {{ a.kesimpulan_terakhir.kelas }}"><i class="bi {{ a.kesimpulan_terakhir.ikon }}"></i>{{ a.kesimpulan_terakhir.label }}</span>{% else %}-{% endif %}</td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'anak_detail' a.pk %}" class="btn btn-sm btn-soft" title="Lihat perkembangan">Lihat</a>
+                        {% if a.aktif %}<a href="{% url 'diagnosis' %}?anak={{ a.pk }}" class="btn btn-sm btn-light" title="Diagnosis baru" aria-label="Diagnosis baru"><i class="bi bi-clipboard2-plus"></i></a>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7"><div class="empty-state"><i class="bi bi-people"></i>Belum ada data anak. <a href="{% url 'anak_tambah' %}">Tambahkan anak</a>.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if halaman.has_other_pages %}
+    <nav class="mt-3" aria-label="Halaman data anak">
+        <ul class="pagination justify-content-center">
+            {% if halaman.has_previous %}<li class="page-item"><a class="page-link" href="{% querystring page=halaman.previous_page_number %}">&laquo; Sebelumnya</a></li>{% endif %}
+            <li class="page-item disabled"><span class="page-link">Halaman {{ halaman.number }} dari {{ halaman.paginator.num_pages }}</span></li>
+            {% if halaman.has_next %}<li class="page-item"><a class="page-link" href="{% querystring page=halaman.next_page_number %}">Berikutnya &raquo;</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

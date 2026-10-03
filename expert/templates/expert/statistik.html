@@ -1,0 +1,419 @@
+{% extends "main.html" %}
+{% load static sp_tags %}
+
+{% block title %}Statistik Perkembangan{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <h1>Statistik Perkembangan Anak</h1>
+            <p class="lead">{{ keterangan }}</p>
+        </div>
+        <div class="d-flex gap-2 no-print">
+            <a href="{% url 'statistik_excel' %}{% if query_ekspor %}?{{ query_ekspor }}{% endif %}" class="btn btn-primary"><i class="bi bi-file-earmark-excel me-1"></i> Unduh Excel</a>
+            <button type="button" class="btn btn-soft" onclick="window.print()"><i class="bi bi-printer me-1"></i> Cetak</button>
+        </div>
+    </div>
+
+    <!-- Filter (berlaku untuk semua grafik di halaman ini) -->
+    <div class="card-sp mb-4 no-print">
+        <div class="card-body">
+            <div class="seg mb-3" role="group" aria-label="Pilih periode">
+                <a href="{% querystring periode=None dari=None sampai=None %}" class="{% if not f.periode %}active{% endif %}">Semua waktu</a>
+                <a href="{% querystring periode='tahun_ajaran' dari=None sampai=None %}" class="{% if f.periode == 'tahun_ajaran' %}active{% endif %}">Tahun ajaran ini</a>
+                <a href="{% querystring periode='6bulan' dari=None sampai=None %}" class="{% if f.periode == '6bulan' %}active{% endif %}">6 bulan terakhir</a>
+                <a href="{% querystring periode='30hari' dari=None sampai=None %}" class="{% if f.periode == '30hari' %}active{% endif %}">30 hari terakhir</a>
+            </div>
+            <form method="get" class="filter-bar">
+                <div>
+                    <label class="form-label" for="dari">Dari tanggal</label>
+                    <input type="date" class="form-control" id="dari" name="dari" value="{% if f.periode == 'kustom' %}{{ f.dari|date:'Y-m-d' }}{% endif %}">
+                </div>
+                <div>
+                    <label class="form-label" for="sampai">Sampai tanggal</label>
+                    <input type="date" class="form-control" id="sampai" name="sampai" value="{% if f.periode == 'kustom' %}{{ f.sampai|date:'Y-m-d' }}{% endif %}">
+                </div>
+                <div>
+                    <label class="form-label" for="kelompok">Kelompok</label>
+                    <select class="form-select" id="kelompok" name="kelompok">
+                        <option value="">Semua kelompok</option>
+                        {% for kode, label in pilihan_kelompok %}<option value="{{ kode }}" {% if f.kelompok == kode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="jk">Jenis kelamin</label>
+                    <select class="form-select" id="jk" name="jk">
+                        <option value="">Semua</option>
+                        {% for kode, label in pilihan_jk %}<option value="{{ kode }}" {% if f.jk == kode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                {% if f.periode and f.periode != 'kustom' %}<input type="hidden" name="periode" value="{{ f.periode }}">{% endif %}
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Terapkan</button>
+                    <a class="btn btn-light" href="{% url 'statistik' %}">Reset</a>
+                </div>
+            </form>
+            <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i>Angka ringkas, capaian per domain, sebaran status, dan kesimpulan dihitung dari <b>diagnosis terakhir setiap anak</b> agar satu anak tidak terhitung berkali-kali. Tren bulanan dan perubahan memakai seluruh diagnosis pada periode ini.</p>
+        </div>
+    </div>
+
+    {% if s.jumlah_diagnosis %}
+    <!-- Angka ringkas -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon blue"><i class="bi bi-people"></i></span>Anak didiagnosis</div>
+                <div class="value">{{ s.jumlah_anak }}</div>
+                <div class="note">dari {{ anak_terdaftar }} anak aktif &middot; {{ s.jumlah_diagnosis }} diagnosis</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon blue"><i class="bi bi-speedometer2"></i></span>Rata-rata capaian</div>
+                <div class="value">{{ s.rata_rata|persen }}</div>
+                <div class="note">{% if s.domain_terlemah %}Terendah: {{ s.domain_terlemah.domain }} ({{ s.domain_terlemah.rata|persen }}){% endif %}</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon green"><i class="bi bi-emoji-smile"></i></span>Sesuai harapan</div>
+                <div class="value">{{ s.persen_sesuai_harapan|persen }}</div>
+                <div class="note">{{ s.jumlah_sesuai_harapan }} anak, semua domain Sesuai</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon orange"><i class="bi bi-exclamation-triangle"></i></span>Perlu perhatian</div>
+                <div class="value">{{ s.jumlah_perlu_perhatian }}<small> anak</small></div>
+                <div class="note">Ada domain Terlambat / Belum Terlihat</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Rata-rata per domain -->
+        <div class="col-lg-7">
+            <div class="card-sp h-100">
+                <div class="card-head">
+                    <div><h2>Rata-rata capaian per domain</h2><p>Persentase indikator terpenuhi, rata-rata seluruh anak</p></div>
+                    <button type="button" class="btn btn-sm btn-light btn-tabel" data-toggle-tabel="tabel-domain" data-grafik="wadah-domain" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+                </div>
+                <div class="card-body">
+                    <div class="chart-box" id="wadah-domain" style="height: 300px"><canvas id="grafik-domain" role="img" aria-label="Rata-rata capaian per domain"></canvas></div>
+                    <div class="tabel-data table-responsive" id="tabel-domain">
+                        <table class="table table-sp table-sm">
+                            <thead><tr><th>Domain</th><th class="num">Rata-rata</th><th class="num">Jumlah anak</th></tr></thead>
+                            <tbody>{% for x in s.rata_domain %}<tr><td>{{ x.domain }}</td><td class="num">{{ x.rata|persen }}</td><td class="num">{{ x.n }}</td></tr>{% endfor %}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Kesimpulan -->
+        <div class="col-lg-5">
+            <div class="card-sp h-100">
+                <div class="card-head">
+                    <div><h2>Sebaran kesimpulan</h2><p>Jumlah anak menurut kesimpulan diagnosis terakhir</p></div>
+                </div>
+                <div class="card-body">
+                    {% for k in s.sebaran_kesimpulan %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge-st {{ k.kelas }}"><span class="rule-code me-1" style="background:transparent;padding:0">{{ k.kode }}</span>{{ k.label }}</span>
+                            <span class="small"><b class="tabular">{{ k.jumlah }}</b> anak &middot; {{ k.persen|persen }}</span>
+                        </div>
+                        <div class="meter {{ k.kelas }}" style="height:10px"><span style="width: {{ k.persen|stringformat:'.1f' }}%"></span></div>
+                    </div>
+                    {% endfor %}
+                    <p class="small text-muted mb-0 mt-2">K01 - K04 adalah aturan kesimpulan pada tahap 2 forward chaining. <a href="{% url 'basis_pengetahuan' %}">Lihat aturan</a>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sebaran status per domain -->
+    <div class="card-sp mb-4">
+        <div class="card-head">
+            <div><h2>Sebaran status per domain</h2><p>Proporsi anak pada setiap status, berdasarkan diagnosis terakhir</p></div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div class="legend-sp">
+                    {% for st in status_urut %}<span><i class="sw" style="background:{{ st.warna }}"></i><i class="bi {{ st.ikon }}" style="color:{{ st.warna }}"></i>{{ st.label }}</span>{% endfor %}
+                </div>
+                <button type="button" class="btn btn-sm btn-light btn-tabel" data-toggle-tabel="tabel-status" data-grafik="wadah-status" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="chart-box" id="wadah-status" style="height: 320px"><canvas id="grafik-status" role="img" aria-label="Sebaran status per domain"></canvas></div>
+            <div class="tabel-data table-responsive" id="tabel-status">
+                <table class="table table-sp table-sm">
+                    <thead><tr><th>Domain</th>{% for st in status_urut %}<th class="num">{{ st.label }}</th>{% endfor %}</tr></thead>
+                    <tbody>
+                    {% for x in s.sebaran_status %}
+                    <tr><td>{{ x.domain }}</td>{% for st in status_urut %}<td class="num">{{ x.jumlah|ambil:st.kunci }} anak ({{ x.persen|ambil:st.kunci|persen }})</td>{% endfor %}</tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tren bulanan -->
+    <div class="card-sp mb-4">
+        <div class="card-head">
+            <div><h2>Tren rata-rata capaian per bulan</h2><p>Rata-rata seluruh diagnosis yang dilakukan pada setiap bulan</p></div>
+            <div class="d-flex align-items-center gap-2">
+                <div class="seg" role="group" aria-label="Tampilan tren">
+                    <button type="button" class="active" data-tren="rata">Keseluruhan</button>
+                    <button type="button" data-tren="domain">Per domain</button>
+                </div>
+                <button type="button" class="btn btn-sm btn-light btn-tabel" data-toggle-tabel="tabel-tren" data-grafik="wadah-tren" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div id="wadah-tren">
+                <div class="legend-sp mb-2" id="legenda-tren"></div>
+                <div class="chart-box" style="height: 300px"><canvas id="grafik-tren" role="img" aria-label="Tren capaian per bulan"></canvas></div>
+                {% if s.tren.label|length < 2 %}<p class="small text-muted mt-2 mb-0">Tren akan lebih bermakna setelah ada diagnosis pada dua bulan atau lebih.</p>{% endif %}
+            </div>
+            <div class="tabel-data table-responsive" id="tabel-tren">
+                <table class="table table-sp table-sm">
+                    <thead><tr><th>Bulan</th><th class="num">Diagnosis</th><th class="num">Keseluruhan</th>{% for d in domains %}<th class="num">{{ d }}</th>{% endfor %}</tr></thead>
+                    <tbody>
+                    {% for label in s.tren.label %}
+                    {% with i=forloop.counter0 %}
+                    <tr>
+                        <td>{{ label }}</td>
+                        <td class="num">{{ s.tren.jumlah|ambil:i }}</td>
+                        <td class="num fw-bold">{{ s.tren.keseluruhan|ambil:i|persen }}</td>
+                        {% for d in domains %}<td class="num">{{ s.tren.per_domain|ambil:d|ambil:i|persen }}</td>{% endfor %}
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <!-- Per kelompok -->
+        <div class="col-lg-6">
+            <div class="card-sp h-100">
+                <div class="card-head">
+                    <div><h2>Perbandingan kelompok</h2><p>Rata-rata capaian per domain tiap kelompok</p></div>
+                    <div class="legend-sp">
+                        {% for k in s.per_kelompok %}<span><i class="sw" style="background:{% if forloop.first %}#2a78d6{% else %}#eb6834{% endif %}"></i>{{ k.label }} ({{ k.n }} anak)</span>{% endfor %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if s.per_kelompok %}
+                    <div class="chart-box" style="height: 340px"><canvas id="grafik-kelompok" role="img" aria-label="Perbandingan capaian antar kelompok"></canvas></div>
+                    {% else %}
+                    <div class="empty-state"><i class="bi bi-diagram-2"></i>Isi kelompok anak (A/B) pada Data Anak untuk melihat perbandingan.</div>
+                    {% endif %}
+                    <div class="d-flex flex-wrap gap-3 small mt-3">
+                        {% for j in s.per_jenis_kelamin %}<span><b>{{ j.label }}</b>: {{ j.n }} anak, rata-rata {{ j.rata|persen }}</span>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Perubahan -->
+        <div class="col-lg-6">
+            <div class="card-sp h-100">
+                <div class="card-head">
+                    <div><h2>Perubahan capaian</h2><p>Diagnosis pertama dibandingkan terakhir, anak yang didiagnosis &ge; 2 kali</p></div>
+                </div>
+                <div class="card-body">
+                    {% if s.perubahan.jumlah_anak %}
+                    <div class="row g-2 text-center mb-3">
+                        <div class="col-4"><div class="small-caps">Naik</div><div class="fs-4 fw-bold" style="color:#1c5cab">{{ s.perubahan.naik }}</div></div>
+                        <div class="col-4"><div class="small-caps">Tetap</div><div class="fs-4 fw-bold text-muted">{{ s.perubahan.tetap }}</div></div>
+                        <div class="col-4"><div class="small-caps">Turun</div><div class="fs-4 fw-bold" style="color:#b42323">{{ s.perubahan.turun }}</div></div>
+                    </div>
+                    <div class="chart-box" style="height: 250px"><canvas id="grafik-perubahan" role="img" aria-label="Rata-rata perubahan capaian per domain"></canvas></div>
+                    <p class="small text-muted mt-2 mb-0">Rata-rata perubahan keseluruhan: <b>{{ s.perubahan.rata_selisih|selisih }} poin</b> dari {{ s.perubahan.jumlah_anak }} anak.</p>
+                    {% else %}
+                    <div class="empty-state"><i class="bi bi-arrow-left-right"></i>Belum ada anak yang didiagnosis dua kali atau lebih pada periode ini.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Anak perlu perhatian -->
+    <div class="card-sp mb-4" id="perlu-perhatian">
+        <div class="card-head">
+            <div><h2>Anak yang perlu perhatian</h2><p>Diurutkan dari jumlah domain bermasalah terbanyak</p></div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sp">
+                <thead><tr><th>Nama anak</th><th>Kelompok</th><th>Diagnosis terakhir</th><th>Capaian</th><th>Domain Terlambat / Belum Terlihat</th><th></th></tr></thead>
+                <tbody>
+                {% for a in s.perlu_perhatian %}
+                <tr>
+                    <td class="fw-semibold">{% if a.anak_id %}<a href="{% url 'anak_detail' a.anak_id %}">{{ a.nama }}</a>{% else %}{{ a.nama }}{% endif %}</td>
+                    <td>{{ a.kelompok|default:"-" }}</td>
+                    <td class="text-nowrap">{{ a.tanggal|date:"j M Y" }}</td>
+                    <td><div class="meter-inline"><div class="meter"><span style="width: {{ a.rata_rata|stringformat:'.1f' }}%"></span></div><b>{{ a.rata_rata|persen }}</b></div></td>
+                    <td>{% for d in a.domain_bermasalah %}<span class="badge-st {{ d.kelas }} me-1 mb-1">{{ d.domain }}</span>{% endfor %}</td>
+                    <td class="text-end">{% if a.id %}<a href="{% url 'riwayat_detail' a.id %}" class="btn btn-sm btn-soft text-nowrap">Lihat saran</a>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6"><div class="empty-state"><i class="bi bi-emoji-smile"></i>Tidak ada anak dengan domain Terlambat atau Belum Terlihat.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-sp">
+        <div class="empty-state">
+            <i class="bi bi-bar-chart"></i>
+            <p class="mb-3">Belum ada data diagnosis untuk filter ini.</p>
+            <a href="{% url 'diagnosis' %}" class="btn btn-primary">Mulai diagnosis</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{{ grafik|json_script:"data-statistik" }}
+{% endblock %}
+
+{% block chart_js %}
+{% include "partials/chartjs.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    if (!window.Chart) return;
+    var g = SP.data("data-statistik");
+    if (!document.getElementById("grafik-domain")) return;
+
+    // 1. Rata-rata capaian per domain (satu seri, satu warna)
+    new Chart(document.getElementById("grafik-domain"), {
+        type: "bar",
+        data: { labels: g.domain, datasets: [Object.assign({ label: "Rata-rata capaian", data: g.rata_domain }, SP.batang(SP.warnaDomain[0]))] },
+        options: {
+            indexAxis: "y", layout: { padding: { right: 48 } },
+            scales: { x: SP.skalaPersen(), y: SP.skalaKategori() },
+            plugins: { labelUjung: { aktif: true }, tooltip: { callbacks: { label: function (c) { return "Rata-rata: " + SP.persen(c.raw); } } } },
+        },
+        plugins: [SP.labelUjung],
+    });
+
+    // 2. Sebaran status per domain (batang bertumpuk 100%)
+    new Chart(document.getElementById("grafik-status"), {
+        type: "bar",
+        data: {
+            labels: g.domain,
+            datasets: g.status.urutan.map(function (st) {
+                return {
+                    label: st.label, data: g.status.persen[st.kunci], jumlah: g.status.jumlah[st.kunci],
+                    backgroundColor: st.warna, borderColor: SP.surface, borderWidth: { left: 0, top: 0, bottom: 0, right: 2 },
+                    borderSkipped: false, maxBarThickness: 26, categoryPercentage: 0.75,
+                };
+            }),
+        },
+        options: {
+            indexAxis: "y",
+            scales: { x: Object.assign(SP.skalaPersen(), { stacked: true }), y: Object.assign(SP.skalaKategori(), { stacked: true }) },
+            plugins: { tooltip: { callbacks: { label: function (c) {
+                return " " + c.dataset.label + ": " + c.dataset.jumlah[c.dataIndex] + " anak (" + SP.persen(c.raw) + ")";
+            } } } },
+        },
+    });
+
+    // 3. Tren per bulan
+    var legenda = document.getElementById("legenda-tren");
+    var dsRata = [Object.assign({ label: "Rata-rata keseluruhan", data: g.tren.keseluruhan }, SP.garis(SP.warnaDomain[0]),
+        { fill: true, backgroundColor: "rgba(42,120,214,.10)", jumlah: g.tren.jumlah })];
+    var dsDomain = g.domain.map(function (d, i) {
+        return Object.assign({ label: d, data: g.tren.per_domain[d] }, SP.garis(SP.warnaDomain[i % SP.warnaDomain.length]));
+    });
+    var tren = new Chart(document.getElementById("grafik-tren"), {
+        type: "line",
+        data: { labels: g.tren.label, datasets: dsRata },
+        options: {
+            interaction: { mode: "index", intersect: false },
+            scales: { y: SP.skalaPersen(), x: { grid: { display: false }, border: { color: SP.axis } } },
+            plugins: { tooltip: { callbacks: {
+                label: function (c) { return " " + c.dataset.label + ": " + SP.persen(c.raw); },
+                footer: function (items) { return g.tren.jumlah[items[0].dataIndex] + " diagnosis"; },
+            } } },
+        },
+    });
+    function legendaTren(ds) {
+        legenda.innerHTML = "";
+        if (ds.length < 2) return;
+        ds.forEach(function (d, i) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "btn btn-sm btn-link p-0 text-decoration-none";
+            b.style.color = "inherit";
+            b.innerHTML = '<span><i class="ln" style="background:' + d.borderColor + '"></i>' + d.label + "</span>";
+            b.title = "Klik untuk menyembunyikan/menampilkan";
+            b.addEventListener("click", function () {
+                var meta = tren.getDatasetMeta(i);
+                meta.hidden = !meta.hidden;
+                b.style.opacity = meta.hidden ? 0.4 : 1;
+                tren.update();
+            });
+            legenda.appendChild(b);
+        });
+    }
+    document.querySelectorAll("[data-tren]").forEach(function (b) {
+        b.addEventListener("click", function () {
+            document.querySelectorAll("[data-tren]").forEach(function (x) { x.classList.toggle("active", x === b); });
+            var ds = b.getAttribute("data-tren") === "domain" ? dsDomain : dsRata;
+            tren.data.datasets = ds;
+            tren.update();
+            legendaTren(ds);
+        });
+    });
+
+    // 4. Perbandingan kelompok
+    var elKel = document.getElementById("grafik-kelompok");
+    if (elKel) {
+        new Chart(elKel, {
+            type: "bar",
+            data: { labels: g.domain, datasets: g.kelompok.map(function (k, i) {
+                return Object.assign({ label: k.label, data: k.rata }, SP.batang(SP.warnaDomain[i]));
+            }) },
+            options: {
+                indexAxis: "y",
+                scales: { x: SP.skalaPersen(), y: SP.skalaKategori() },
+                plugins: { tooltip: { callbacks: { label: function (c) { return " " + c.dataset.label + ": " + SP.persen(c.raw); } } } },
+            },
+        });
+    }
+
+    // 5. Perubahan capaian per domain (divergen: naik biru, turun merah)
+    var elPer = document.getElementById("grafik-perubahan");
+    if (elPer) {
+        var nilai = g.perubahan.map(function (x) { return x.selisih; });
+        var maks = Math.max(10, Math.ceil(Math.max.apply(null, nilai.map(function (v) { return Math.abs(v || 0); })) / 10) * 10);
+        new Chart(elPer, {
+            type: "bar",
+            data: { labels: g.perubahan.map(function (x) { return x.domain; }), datasets: [{
+                label: "Rata-rata perubahan", data: nilai,
+                backgroundColor: nilai.map(function (v) { return v < 0 ? SP.turun : SP.naik; }),
+                borderRadius: 4, borderSkipped: "start", maxBarThickness: 18,
+            }] },
+            options: {
+                indexAxis: "y", layout: { padding: { left: 8, right: 56 } },
+                scales: {
+                    x: { min: -maks, max: maks, ticks: { callback: function (v) { return (v > 0 ? "+" : "") + v; } }, grid: { color: SP.grid }, border: { display: false } },
+                    y: SP.skalaKategori(),
+                },
+                plugins: {
+                    labelUjung: { aktif: true, format: function (v) { return SP.poin(v); } },
+                    tooltip: { callbacks: { label: function (c) { return " " + SP.poin(c.raw) + " (" + g.perubahan[c.dataIndex].n + " anak)"; } } },
+                },
+            },
+            plugins: [SP.labelUjung, SP.garisNol],
+        });
+    }
+})();
+</script>
+{% endblock %}

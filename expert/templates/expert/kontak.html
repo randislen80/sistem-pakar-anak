@@ -1,0 +1,50 @@
+{% extends "main.html" %}
+
+{% block title %}Kontak{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <h1>Kontak Kami</h1>
+        <p class="lead">Orang tua dapat mengirim pertanyaan seputar perkembangan anak kepada guru.</p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card-sp h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">{{ sekolah.nama }}</h2>
+                    <ul class="list-unstyled mb-0">
+                        <li class="d-flex gap-3 mb-3"><span class="stat-icon blue"><i class="bi bi-geo-alt"></i></span><div><div class="small-caps">Alamat</div>{{ sekolah.alamat }}</div></li>
+                        {% if sekolah.telepon %}<li class="d-flex gap-3 mb-3"><span class="stat-icon blue"><i class="bi bi-telephone"></i></span><div><div class="small-caps">Telepon</div>{{ sekolah.telepon }}</div></li>{% endif %}
+                        {% if sekolah.email %}<li class="d-flex gap-3 mb-3"><span class="stat-icon blue"><i class="bi bi-envelope"></i></span><div><div class="small-caps">Email</div><a href="mailto:{{ sekolah.email }}">{{ sekolah.email }}</a></div></li>{% endif %}
+                        <li class="d-flex gap-3"><span class="stat-icon green"><i class="bi bi-clock"></i></span><div><div class="small-caps">Pesan</div>Pesan yang dikirim lewat formulir akan dibaca guru melalui halaman Admin.</div></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <form method="post" class="card-sp" novalidate>
+                {% csrf_token %}
+                <div class="card-head"><div><h2>Kirim pesan</h2></div></div>
+                <div class="card-body">
+                    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors.0 }}</div>{% endif %}
+                    <div class="row g-3">
+                        {% for field in form %}
+                        <div class="{% if field.name == 'pesan' or field.name == 'nama' %}col-12{% else %}col-md-6{% endif %}">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}</label>
+                            {{ field }}
+                            {% for e in field.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="card-body border-top text-end">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-send me-1"></i> Kirim pesan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

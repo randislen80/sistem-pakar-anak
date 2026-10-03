@@ -1,0 +1,97 @@
+{% extends "main.html" %}
+{% load sp_tags %}
+
+{% block title %}Riwayat Diagnosis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <h1>Riwayat Diagnosis</h1>
+            <p class="lead">{{ total }} diagnosis tersimpan{% if q or kesimpulan or filter.kelompok or filter.dari or filter.sampai %} sesuai filter{% endif %}.</p>
+        </div>
+        <a href="{% url 'diagnosis' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Diagnosis baru</a>
+    </div>
+
+    <div class="card-sp mb-3">
+        <div class="card-body">
+            <form method="get" class="filter-bar">
+                <div class="flex-grow-1">
+                    <label class="form-label" for="q">Cari nama anak</label>
+                    <input type="search" class="form-control" id="q" name="q" value="{{ q }}" placeholder="Ketik nama...">
+                </div>
+                <div>
+                    <label class="form-label" for="kelompok">Kelompok</label>
+                    <select class="form-select" id="kelompok" name="kelompok">
+                        <option value="">Semua</option>
+                        {% for kode, label in pilihan_kelompok %}<option value="{{ kode }}" {% if filter.kelompok == kode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="kesimpulan">Kesimpulan</label>
+                    <select class="form-select" id="kesimpulan" name="kesimpulan">
+                        <option value="">Semua</option>
+                        {% for kode, label in pilihan_kesimpulan %}<option value="{{ kode }}" {% if kesimpulan == kode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="dari">Dari tanggal</label>
+                    <input type="date" class="form-control" id="dari" name="dari" value="{{ filter.dari|date:'Y-m-d' }}">
+                </div>
+                <div>
+                    <label class="form-label" for="sampai">Sampai tanggal</label>
+                    <input type="date" class="form-control" id="sampai" name="sampai" value="{{ filter.sampai|date:'Y-m-d' }}">
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Terapkan</button>
+                    <a class="btn btn-light" href="{% url 'riwayat_list' %}">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card-sp">
+        <div class="table-responsive">
+            <table class="table table-sp">
+                <thead>
+                    <tr><th>Tanggal</th><th>Nama anak</th><th>Kelompok</th><th>Usia</th><th>Rata-rata capaian</th><th>Kesimpulan</th><th class="text-end">Aksi</th></tr>
+                </thead>
+                <tbody>
+                {% for r in halaman %}
+                {% with k=r.kesimpulan_info %}
+                <tr>
+                    <td class="text-nowrap tabular">{{ r.tanggal|date:"d-m-Y" }}<div class="small text-muted">{{ r.tanggal|date:"H:i" }}</div></td>
+                    <td>
+                        {% if r.anak_id %}<a class="fw-semibold" href="{% url 'anak_detail' r.anak_id %}">{{ r.nama_anak }}</a>{% else %}<span class="fw-semibold">{{ r.nama_anak }}</span>{% endif %}
+                    </td>
+                    <td>{{ r.anak.kelompok|default:"-" }}</td>
+                    <td class="text-nowrap">{{ r.usia|default:"-" }}</td>
+                    <td>
+                        <div class="meter-inline"><div class="meter"><span style="width: {{ r.rata_rata|stringformat:'.1f' }}%"></span></div><b>{{ r.rata_rata|persen }}</b></div>
+                    </td>
+                    <td><span class="badge-st {{ k.kelas }}"><i class="bi {{ k.ikon }}"></i>{{ k.label }}</span></td>
+                    <td class="text-end text-nowrap">
+                        <a href="{% url 'riwayat_detail' r.pk %}" class="btn btn-sm btn-soft">Lihat hasil</a>
+                        <a href="{% url 'riwayat_pdf' r.pk %}" class="btn btn-sm btn-light" title="Unduh PDF" aria-label="Unduh PDF"><i class="bi bi-file-earmark-pdf"></i></a>
+                    </td>
+                </tr>
+                {% endwith %}
+                {% empty %}
+                <tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i>Belum ada riwayat diagnosis{% if q %} untuk "{{ q }}"{% endif %}.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if halaman.has_other_pages %}
+    <nav class="mt-3" aria-label="Halaman riwayat">
+        <ul class="pagination justify-content-center">
+            {% if halaman.has_previous %}<li class="page-item"><a class="page-link" href="{% querystring page=halaman.previous_page_number %}">&laquo; Sebelumnya</a></li>{% endif %}
+            <li class="page-item disabled"><span class="page-link">Halaman {{ halaman.number }} dari {{ halaman.paginator.num_pages }}</span></li>
+            {% if halaman.has_next %}<li class="page-item"><a class="page-link" href="{% querystring page=halaman.next_page_number %}">Berikutnya &raquo;</a></li>{% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

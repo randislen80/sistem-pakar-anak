@@ -1,0 +1,1 @@
+web: gunicorn nama_project.wsgi

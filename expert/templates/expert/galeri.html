@@ -1,0 +1,59 @@
+{% extends "main.html" %}
+
+{% block title %}Galeri Kegiatan{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <h1>Galeri Kegiatan Anak</h1>
+        <p class="lead">Dokumentasi kegiatan belajar dan bermain di {{ sekolah.nama }}.</p>
+    </div>
+
+    <div class="row g-3">
+        {% for g in data %}
+        <div class="col-sm-6 col-lg-4 col-xl-3">
+            <div class="card-sp galeri-item h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#modalFoto"
+                 data-foto="{{ g.foto.url }}" data-judul="{{ g.judul_kegiatan|default:'Kegiatan' }}" data-ket="{{ g.keterangan|default:'' }}">
+                <img src="{{ g.foto.url }}" alt="{{ g.judul_kegiatan|default:'Foto kegiatan' }}" class="rounded-top" loading="lazy">
+                <div class="card-body">
+                    <h2 class="h6 mb-1">{{ g.judul_kegiatan|default:"Kegiatan" }}</h2>
+                    <div class="small text-muted mb-1"><i class="bi bi-calendar3 me-1"></i>{{ g.tanggal|date:"j F Y" }}</div>
+                    {% if g.keterangan %}<p class="small mb-0">{{ g.keterangan }}</p>{% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12"><div class="card-sp empty-state"><i class="bi bi-images"></i>Belum ada foto kegiatan. Foto dapat ditambahkan melalui halaman Admin.</div></div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalFoto" tabindex="-1" aria-labelledby="modalFotoJudul" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="modalFotoJudul">Foto kegiatan</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <img src="" alt="" id="modalFotoGambar" class="w-100">
+            <div class="modal-body small" id="modalFotoKet"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById("modalFoto").addEventListener("show.bs.modal", function (e) {
+    var el = e.relatedTarget;
+    document.getElementById("modalFotoJudul").textContent = el.getAttribute("data-judul");
+    var img = document.getElementById("modalFotoGambar");
+    img.src = el.getAttribute("data-foto");
+    img.alt = el.getAttribute("data-judul");
+    document.getElementById("modalFotoKet").textContent = el.getAttribute("data-ket");
+});
+document.querySelectorAll(".galeri-item").forEach(function (el) {
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") el.click(); });
+});
+</script>
+{% endblock %}

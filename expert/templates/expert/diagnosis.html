@@ -1,0 +1,230 @@
+{% extends "main.html" %}
+{% load static %}
+
+{% block title %}Diagnosis{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <h1>Diagnosis Perkembangan Anak</h1>
+        <p class="lead">Centang hanya kemampuan yang <b>benar-benar sudah terlihat</b> saat pengamatan. Kemampuan yang belum muncul biarkan kosong.</p>
+    </div>
+
+    <form method="post" id="form-diagnosis" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <!-- Data anak -->
+                <div class="card-sp mb-4">
+                    <div class="card-head"><div><h2><i class="bi bi-person-badge me-2 text-primary"></i>Data anak</h2><p>Pilih anak yang sudah terdaftar atau daftarkan anak baru.</p></div></div>
+                    <div class="card-body">
+                        <div class="d-flex gap-2 mode-switch mb-3" role="group" aria-label="Pilih jenis data anak">
+                            <input type="radio" class="btn-check" name="mode" id="mode-terdaftar" value="terdaftar" {% if mode != 'baru' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="mode-terdaftar"><i class="bi bi-person-check me-1"></i> Anak terdaftar</label>
+                            <input type="radio" class="btn-check" name="mode" id="mode-baru" value="baru" {% if mode == 'baru' %}checked{% endif %}>
+                            <label class="btn btn-outline-primary" for="mode-baru"><i class="bi bi-person-plus me-1"></i> Anak baru</label>
+                        </div>
+
+                        <div id="bagian-terdaftar">
+                            <label class="form-label" for="{{ form.anak.id_for_label }}">{{ form.anak.label }}</label>
+                            <div class="d-flex gap-2">
+                                <div class="flex-grow-1">{{ form.anak }}</div>
+                                <a href="{% url 'anak_tambah' %}?next=diagnosis" class="btn btn-soft text-nowrap" title="Tambah data anak lengkap"><i class="bi bi-plus-lg"></i><span class="d-none d-sm-inline"> Data lengkap</span></a>
+                            </div>
+                            {% if form.anak.errors %}<div class="invalid-feedback d-block">{{ form.anak.errors.0 }}</div>{% endif %}
+                            <div id="info-anak" class="mt-3 p-3 rounded-3 d-none" style="background:#f7f9fc">
+                                <div class="row g-2 small">
+                                    <div class="col-6 col-md-3"><div class="small-caps">Usia</div><b data-info="usia">-</b></div>
+                                    <div class="col-6 col-md-3"><div class="small-caps">Kelompok</div><b data-info="kelompok">-</b></div>
+                                    <div class="col-6 col-md-3"><div class="small-caps">Diagnosis</div><b data-info="jumlah">-</b></div>
+                                    <div class="col-6 col-md-3"><div class="small-caps">Terakhir</div><b data-info="tanggal_terakhir">-</b></div>
+                                </div>
+                                <button type="button" id="btn-muat" class="btn btn-sm btn-soft mt-3 d-none">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Muat centang dari diagnosis terakhir
+                                </button>
+                                <div class="form-text mt-1" id="teks-muat"></div>
+                            </div>
+                        </div>
+
+                        <div id="bagian-baru" class="d-none">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.nama_baru.id_for_label }}">{{ form.nama_baru.label }}</label>
+                                    {{ form.nama_baru }}
+                                    {% if form.nama_baru.errors %}<div class="invalid-feedback d-block">{{ form.nama_baru.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.jenis_kelamin_baru.id_for_label }}">{{ form.jenis_kelamin_baru.label }}</label>
+                                    {{ form.jenis_kelamin_baru }}
+                                    {% if form.jenis_kelamin_baru.errors %}<div class="invalid-feedback d-block">{{ form.jenis_kelamin_baru.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.tanggal_lahir_baru.id_for_label }}">{{ form.tanggal_lahir_baru.label }}</label>
+                                    {{ form.tanggal_lahir_baru }}
+                                    {% if form.tanggal_lahir_baru.errors %}<div class="invalid-feedback d-block">{{ form.tanggal_lahir_baru.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="{{ form.kelompok_baru.id_for_label }}">{{ form.kelompok_baru.label }}</label>
+                                    {{ form.kelompok_baru }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.tanggal.id_for_label }}">{{ form.tanggal.label }}</label>
+                                {{ form.tanggal }}
+                                {% if form.tanggal.errors %}<div class="invalid-feedback d-block">{{ form.tanggal.errors.0 }}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6 small text-muted">Isi tanggal lampau bila memasukkan hasil pengamatan yang sudah dilakukan sebelumnya.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indikator per domain -->
+                {% for d in basis %}
+                <div class="card-sp domain-card mb-3" data-domain>
+                    <div class="card-head">
+                        <div>
+                            <h2><span class="kode">{{ d.kode|default:forloop.counter }}</span>{{ d.nama }}</h2>
+                            {% if d.deskripsi %}<p>{{ d.deskripsi }}</p>{% endif %}
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="counter"><span data-jumlah>0</span>/{{ d.indikator|length }}</span>
+                            <button type="button" class="btn btn-sm btn-soft" data-pilih-semua>Pilih semua</button>
+                            <button type="button" class="btn btn-sm btn-light" data-kosongkan>Kosongkan</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% for i in d.indikator %}
+                        <label class="indikator-opsi">
+                            <input type="checkbox" class="form-check-input" name="indikator" value="{{ i.id }}" {% if i.id in terpilih %}checked{% endif %}>
+                            <span><span class="kode-ind">{{ i.kode }}</span>{{ i.deskripsi }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="alert alert-warning">Basis pengetahuan masih kosong. Tambahkan domain dan indikator melalui halaman Admin.</div>
+                {% endfor %}
+                {% if form.indikator.errors %}<div class="alert alert-danger">{{ form.indikator.errors.0 }}</div>{% endif %}
+
+                <div class="card-sp mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="{{ form.catatan.id_for_label }}">{{ form.catatan.label }}</label>
+                        {{ form.catatan }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ringkasan pilihan -->
+            <div class="col-lg-4">
+                <div class="ringkas-sticky">
+                    <div class="card-sp mb-3">
+                        <div class="card-body">
+                            <div class="small-caps mb-1">Kemampuan dipilih</div>
+                            <div class="hero-number mb-3"><span id="total-dipilih">0</span><small> / {{ total_indikator }}</small></div>
+                            <div class="ringkas-domain" id="ringkas-domain">
+                                {% for d in basis %}
+                                <span>{{ d.nama }}</span><b class="tabular" data-ringkas="{{ forloop.counter0 }}">0/{{ d.indikator|length }}</b>
+                                <div class="meter" style="grid-column: 1 / -1; margin-bottom:.4rem"><span data-meter="{{ forloop.counter0 }}" style="width:0%"></span></div>
+                                {% endfor %}
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg w-100 mt-3"><i class="bi bi-cpu me-1"></i> Proses Diagnosis</button>
+                            <p class="small text-muted mt-2 mb-0">Hasil otomatis tersimpan ke riwayat anak.</p>
+                        </div>
+                    </div>
+                    <img src="{% static 'img/anak-puzzle-web.jpg' %}" alt="Ilustrasi anak bermain puzzle" class="img-fluid rounded-4 d-none d-lg-block" style="max-height:340px;width:100%;object-fit:cover">
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{{ info_anak|json_script:"data-info-anak" }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById("form-diagnosis");
+    var infoAnak = JSON.parse(document.getElementById("data-info-anak").textContent);
+    var kartu = Array.prototype.slice.call(document.querySelectorAll("[data-domain]"));
+
+    function perbarui() {
+        var total = 0;
+        kartu.forEach(function (k, idx) {
+            var kotak = k.querySelectorAll('input[name="indikator"]');
+            var n = k.querySelectorAll('input[name="indikator"]:checked').length;
+            total += n;
+            k.querySelector("[data-jumlah]").textContent = n;
+            var r = document.querySelector('[data-ringkas="' + idx + '"]');
+            if (r) r.textContent = n + "/" + kotak.length;
+            var m = document.querySelector('[data-meter="' + idx + '"]');
+            if (m) m.style.width = (kotak.length ? (n / kotak.length * 100) : 0) + "%";
+        });
+        document.getElementById("total-dipilih").textContent = total;
+    }
+
+    kartu.forEach(function (k) {
+        k.querySelector("[data-pilih-semua]").addEventListener("click", function () {
+            k.querySelectorAll('input[name="indikator"]').forEach(function (c) { c.checked = true; });
+            perbarui();
+        });
+        k.querySelector("[data-kosongkan]").addEventListener("click", function () {
+            k.querySelectorAll('input[name="indikator"]').forEach(function (c) { c.checked = false; });
+            perbarui();
+        });
+    });
+    form.addEventListener("change", function (e) {
+        if (e.target.name === "indikator") perbarui();
+        if (e.target.name === "mode") aturMode();
+        if (e.target.name === "anak") tampilkanInfo();
+    });
+
+    function aturMode() {
+        var baru = document.getElementById("mode-baru").checked;
+        document.getElementById("bagian-baru").classList.toggle("d-none", !baru);
+        document.getElementById("bagian-terdaftar").classList.toggle("d-none", baru);
+    }
+
+    var btnMuat = document.getElementById("btn-muat");
+    function tampilkanInfo() {
+        var pilih = form.querySelector('[name="anak"]');
+        var data = pilih ? infoAnak[pilih.value] : null;
+        var kotak = document.getElementById("info-anak");
+        kotak.classList.toggle("d-none", !data);
+        document.getElementById("teks-muat").textContent = "";
+        if (!data) return;
+        kotak.querySelectorAll("[data-info]").forEach(function (el) {
+            var v = data[el.getAttribute("data-info")];
+            el.textContent = (v === "" || v === null || v === undefined) ? "-" : (el.getAttribute("data-info") === "jumlah" ? v + " kali" : v);
+        });
+        btnMuat.classList.toggle("d-none", !(data.terakhir && data.terakhir.length));
+    }
+    btnMuat.addEventListener("click", function () {
+        var pilih = form.querySelector('[name="anak"]');
+        var data = infoAnak[pilih.value];
+        if (!data) return;
+        var ids = data.terakhir.map(String);
+        form.querySelectorAll('input[name="indikator"]').forEach(function (c) { c.checked = ids.indexOf(c.value) !== -1; });
+        perbarui();
+        document.getElementById("teks-muat").textContent = "Centang dari diagnosis " + data.tanggal_terakhir + " dimuat. Tambahkan kemampuan yang baru muncul.";
+    });
+
+    form.addEventListener("submit", function (e) {
+        var n = form.querySelectorAll('input[name="indikator"]:checked').length;
+        if (n === 0 && !confirm("Belum ada kemampuan yang dicentang. Semua domain akan berstatus \"Belum Terlihat\". Lanjutkan?")) {
+            e.preventDefault();
+        }
+    });
+
+    aturMode();
+    tampilkanInfo();
+    perbarui();
+})();
+</script>
+{% endblock %}

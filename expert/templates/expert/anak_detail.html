@@ -1,0 +1,326 @@
+{% extends "main.html" %}
+{% load static sp_tags %}
+
+{% block title %}Perkembangan {{ anak.nama }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-head">
+        <nav aria-label="breadcrumb" class="no-print">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'anak_list' %}">Data Anak</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ anak.nama }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <span class="avatar lg {% if anak.jenis_kelamin == 'P' %}p{% endif %}">{{ anak.inisial }}</span>
+                <div>
+                    <h1 class="mb-1">{{ anak.nama }}{% if not anak.aktif %} <span class="badge text-bg-secondary align-middle fs-6">Tidak aktif</span>{% endif %}</h1>
+                    <p class="lead">
+                        {{ anak.get_jenis_kelamin_display|default:"Jenis kelamin belum diisi" }} &middot; {{ anak.usia_teks }}
+                        {% if anak.kelompok %}&middot; {{ anak.get_kelompok_display }}{% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2 no-print">
+                {% if anak.aktif %}<a href="{% url 'diagnosis' %}?anak={{ anak.pk }}" class="btn btn-primary"><i class="bi bi-clipboard2-plus me-1"></i> Diagnosis baru</a>{% endif %}
+                {% if p.ada_data %}<a href="{% url 'anak_pdf' anak.pk %}" class="btn btn-soft"><i class="bi bi-file-earmark-pdf me-1"></i> Laporan perkembangan</a>{% endif %}
+                <a href="{% url 'anak_ubah' anak.pk %}" class="btn btn-soft"><i class="bi bi-pencil me-1"></i> Ubah data</a>
+            </div>
+        </div>
+    </div>
+
+    {% if not anak.tanggal_lahir %}
+    <div class="alert alert-warning small"><i class="bi bi-calendar-x me-1"></i> Tanggal lahir belum diisi, sehingga usia tidak dapat dihitung otomatis. <a href="{% url 'anak_ubah' anak.pk %}">Lengkapi data anak</a>.</div>
+    {% endif %}
+
+    {% if p.ada_data %}
+    <!-- Angka ringkas -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon blue"><i class="bi bi-graph-up"></i></span>Capaian terakhir</div>
+                <div class="value">{{ p.rata_terakhir|persen }}</div>
+                <div class="note">
+                    {% if p.selisih_terakhir is not None %}
+                    <span class="delta {{ p.selisih_terakhir|arah }}">{{ p.selisih_terakhir|selisih }} poin</span> dari diagnosis sebelumnya
+                    {% else %}Baru satu kali diagnosis{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon green"><i class="bi bi-arrow-up-right"></i></span>Sejak diagnosis pertama</div>
+                <div class="value">{% if p.selisih_total is not None %}{{ p.selisih_total|selisih }}<small> poin</small>{% else %}-{% endif %}</div>
+                <div class="note">{{ p.jumlah }} kali diagnosis</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon yellow"><i class="bi bi-trophy"></i></span>Domain terkuat</div>
+                <div class="value fs-5 mt-2">{{ p.terkuat.0 }}</div>
+                <div class="note">{{ p.terkuat.1|persen }} pada diagnosis terakhir</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card-sp stat-tile">
+                <div class="label"><span class="stat-icon orange"><i class="bi bi-bullseye"></i></span>Perlu difokuskan</div>
+                <div class="value fs-5 mt-2">{% if p.terlemah.1 < 100 %}{{ p.terlemah.0 }}{% else %}Tidak ada{% endif %}</div>
+                <div class="note">{% if p.terlemah.1 < 100 %}{{ p.terlemah.1|persen }} pada diagnosis terakhir{% else %}Semua domain sudah sesuai{% endif %}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+            <div class="card-sp h-100">
+                <div class="card-head">
+                    <div>
+                        <h2>Perkembangan capaian dari waktu ke waktu</h2>
+                        <p>{% if p.jumlah > 1 %}Persentase indikator terpenuhi pada setiap diagnosis{% else %}Grafik garis muncul setelah anak didiagnosis minimal dua kali{% endif %}</p>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center no-print">
+                        {% if p.jumlah > 1 %}
+                        <div class="seg" role="group" aria-label="Tampilan grafik">
+                            <button type="button" class="active" data-mode="domain">Per domain</button>
+                            <button type="button" data-mode="rata">Rata-rata</button>
+                        </div>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-light btn-tabel" data-toggle-tabel="tabel-tren" data-grafik="wadah-tren" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="wadah-tren">
+                        <div class="legend-sp mb-2" id="legenda-tren"></div>
+                        <div class="chart-box" style="height: 320px"><canvas id="grafik-tren" role="img" aria-label="Grafik perkembangan capaian anak"></canvas></div>
+                    </div>
+                    <div class="tabel-data table-responsive" id="tabel-tren">
+                        <table class="table table-sp table-sm">
+                            <thead><tr><th>Tanggal</th>{% for d in domains %}<th class="num">{{ d }}</th>{% endfor %}<th class="num">Rata-rata</th></tr></thead>
+                            <tbody>
+                            {% for b in p.baris %}
+                            <tr><td class="text-nowrap">{{ b.tanggal_teks }}</td>{% for s in b.sel %}<td class="num">{% if s %}{{ s.persen|persen }}{% else %}-{% endif %}</td>{% endfor %}<td class="num fw-bold">{{ b.rata_rata|persen }}</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="kesimpulan-box {{ kesimpulan_terakhir.kelas }} mb-3" style="height:auto">
+                <div class="small-caps"><i class="bi {{ kesimpulan_terakhir.ikon }} me-1"></i>Kesimpulan terakhir</div>
+                <h2>{{ kesimpulan_terakhir.label }}</h2>
+                <p class="small">{{ kesimpulan_terakhir.saran }}</p>
+            </div>
+            <div class="card-sp">
+                <div class="card-head"><div><h2>Fokus stimulasi berikutnya</h2><p>Domain yang belum berstatus Sesuai</p></div></div>
+                {% if p.fokus %}
+                <ul class="list-mini">
+                    {% for f in p.fokus %}
+                    <li>
+                        <span class="dot-st {{ f.kelas }}"></span>
+                        <div class="grow"><span class="fw-semibold">{{ f.domain }}</span><div class="meta">{{ f.label }}</div></div>
+                        <b class="tabular">{{ f.persen|persen }}</b>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="card-body pt-2"><a href="{% url 'riwayat_detail' p.terakhir.id %}" class="small fw-semibold">Lihat saran kegiatan <i class="bi bi-arrow-right"></i></a></div>
+                {% else %}
+                <div class="empty-state"><i class="bi bi-emoji-laughing"></i>Semua domain sudah sesuai. Berikan kegiatan pengayaan.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if pembanding %}
+    <div class="card-sp mb-4">
+        <div class="card-head">
+            <div>
+                <h2>Dibandingkan teman sekelompok</h2>
+                <p>Capaian diagnosis terakhir {{ anak.nama }} dan rata-rata {{ pembanding.n }} anak lain di {{ anak.get_kelompok_display }}</p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="legend-sp">
+                    <span><i class="sw" style="background:#2a78d6"></i>{{ anak.nama }}</span>
+                    <span><i class="sw" style="background:#eb6834"></i>{{ pembanding.label }}</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-light btn-tabel no-print" data-toggle-tabel="tabel-banding" data-grafik="wadah-banding" aria-expanded="false"><i class="bi bi-table"></i> Tabel</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="chart-box" id="wadah-banding" style="height: 340px"><canvas id="grafik-banding" role="img" aria-label="Perbandingan dengan rata-rata kelompok"></canvas></div>
+            <div class="tabel-data table-responsive" id="tabel-banding">
+                <table class="table table-sp table-sm">
+                    <thead><tr><th>Domain</th><th class="num">{{ anak.nama }}</th><th class="num">{{ pembanding.label }}</th></tr></thead>
+                    <tbody>
+                    {% for d in domains %}
+                    <tr><td>{{ d }}</td><td class="num">{{ grafik.terakhir|ambil:forloop.counter0|persen }}</td><td class="num">{{ pembanding.nilai|ambil:forloop.counter0|persen }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Riwayat -->
+    <div class="card-sp mb-4">
+        <div class="card-head"><div><h2>Riwayat diagnosis</h2><p>Warna menunjukkan status; angka kecil adalah perubahan dari diagnosis sebelumnya.</p></div></div>
+        <div class="table-responsive">
+            <table class="table table-sp table-matriks">
+                <thead><tr><th>Tanggal</th>{% for d in domains %}<th class="center">{{ d }}</th>{% endfor %}<th class="num">Rata-rata</th><th></th></tr></thead>
+                <tbody>
+                {% for b in p.baris %}
+                <tr>
+                    <td class="text-nowrap"><span class="fw-semibold">{{ b.tanggal_teks }}</span><div class="small text-muted">{{ b.usia|default:"" }}</div></td>
+                    {% for s in b.sel %}
+                    <td class="center">
+                        {% if s %}
+                        <span class="badge-st {{ s.kelas }}" title="{{ s.label }}">{{ s.persen|persen }}</span>
+                        {% if s.selisih %}<div class="delta delta-blok {{ s.selisih|arah }}">{{ s.selisih|selisih }}</div>{% endif %}
+                        {% else %}<span class="text-muted">-</span>{% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="num fw-bold">{{ b.rata_rata|persen }}{% if b.selisih_rata %}<div class="delta {{ b.selisih_rata|arah }} d-flex justify-content-end">{{ b.selisih_rata|selisih }}</div>{% endif %}</td>
+                    <td class="text-end"><a href="{% url 'riwayat_detail' b.id %}" class="btn btn-sm btn-soft">Detail</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-body border-top legend-sp">
+            {% for s in status_legenda %}<span><i class="dot-st {{ s.kelas }}"></i>{{ s.label }}</span>{% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="card-sp mb-4">
+        <div class="empty-state">
+            <i class="bi bi-clipboard2-data"></i>
+            <p class="mb-3">{{ anak.nama }} belum pernah didiagnosis. Statistik perkembangan akan muncul setelah diagnosis pertama.</p>
+            {% if anak.aktif %}<a href="{% url 'diagnosis' %}?anak={{ anak.pk }}" class="btn btn-primary">Mulai diagnosis</a>{% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Identitas -->
+    <div class="card-sp mb-4">
+        <div class="card-head"><div><h2>Identitas anak</h2></div></div>
+        <div class="card-body">
+            <div class="row g-3 small">
+                <div class="col-6 col-md-3"><div class="small-caps">Nomor induk</div>{{ anak.nomor_induk|default:"-" }}</div>
+                <div class="col-6 col-md-3"><div class="small-caps">Tanggal lahir</div>{{ anak.tanggal_lahir|date:"j F Y"|default:"-" }}</div>
+                <div class="col-6 col-md-3"><div class="small-caps">Orang tua/wali</div>{{ anak.nama_orang_tua|default:"-" }}</div>
+                <div class="col-6 col-md-3"><div class="small-caps">No. HP orang tua</div>{{ anak.kontak_orang_tua|default:"-" }}</div>
+                {% if anak.catatan %}<div class="col-12"><div class="small-caps">Catatan</div>{{ anak.catatan|linebreaksbr }}</div>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between flex-wrap gap-2 no-print">
+        <a href="{% url 'anak_list' %}" class="btn btn-light"><i class="bi bi-arrow-left me-1"></i> Kembali ke data anak</a>
+        <a href="{% url 'anak_hapus' anak.pk %}" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i> Hapus data anak</a>
+    </div>
+</div>
+{% if grafik %}{{ grafik|json_script:"data-grafik" }}{% endif %}
+{% endblock %}
+
+{% block chart_js %}
+{% if grafik %}
+{% include "partials/chartjs.html" %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if grafik %}
+<script>
+(function () {
+    if (!window.Chart) return;
+    var g = SP.data("data-grafik");
+    var satuKali = g.label.length < 2;
+
+    // ---- Grafik perkembangan (garis per domain / rata-rata) ----
+    var legenda = document.getElementById("legenda-tren");
+    var dsDomain = g.domain.map(function (d, i) {
+        return Object.assign({ label: d, data: g.seri[d] }, SP.garis(SP.warnaDomain[i % SP.warnaDomain.length]));
+    });
+    var dsRata = [Object.assign({ label: "Rata-rata capaian", data: g.keseluruhan, fill: true,
+        backgroundColor: "rgba(42,120,214,.10)" }, SP.garis(SP.warnaDomain[0]), { backgroundColor: "rgba(42,120,214,.10)" })];
+
+    var tren;
+    if (satuKali) {
+        tren = new Chart(document.getElementById("grafik-tren"), {
+            type: "bar",
+            data: { labels: g.domain, datasets: [Object.assign({ label: "Capaian", data: g.terakhir }, SP.batang(SP.warnaDomain[0]))] },
+            options: {
+                indexAxis: "y", layout: { padding: { right: 48 } },
+                scales: { x: SP.skalaPersen(), y: SP.skalaKategori() },
+                plugins: { labelUjung: { aktif: true }, tooltip: { callbacks: { label: function (c) { return SP.persen(c.raw); } } } },
+            },
+            plugins: [SP.labelUjung],
+        });
+    } else {
+        tren = new Chart(document.getElementById("grafik-tren"), {
+            type: "line",
+            data: { labels: g.label, datasets: dsDomain },
+            options: {
+                interaction: { mode: "index", intersect: false },
+                scales: { y: SP.skalaPersen({ min: 0, max: 100 }), x: { grid: { display: false }, border: { color: SP.axis } } },
+                plugins: { tooltip: { itemSort: function (a, b) { return b.raw - a.raw; },
+                    callbacks: { label: function (c) { return " " + c.dataset.label + ": " + SP.persen(c.raw); } } } },
+            },
+        });
+        buatLegenda(dsDomain);
+        document.querySelectorAll("[data-mode]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                document.querySelectorAll("[data-mode]").forEach(function (x) { x.classList.toggle("active", x === b); });
+                var ds = b.getAttribute("data-mode") === "rata" ? dsRata : dsDomain;
+                tren.data.datasets = ds;
+                tren.update();
+                buatLegenda(ds);
+            });
+        });
+    }
+
+    function buatLegenda(ds) {
+        legenda.innerHTML = "";
+        if (ds.length < 2) { legenda.textContent = ""; return; }
+        ds.forEach(function (d, i) {
+            var s = document.createElement("button");
+            s.type = "button";
+            s.className = "btn btn-sm btn-link p-0 text-decoration-none";
+            s.style.color = "inherit";
+            s.innerHTML = '<span><i class="ln" style="background:' + d.borderColor + '"></i>' + d.label + "</span>";
+            s.title = "Klik untuk menyembunyikan/menampilkan";
+            s.addEventListener("click", function () {
+                var meta = tren.getDatasetMeta(i);
+                meta.hidden = !meta.hidden;
+                s.style.opacity = meta.hidden ? 0.4 : 1;
+                tren.update();
+            });
+            legenda.appendChild(s);
+        });
+    }
+
+    // ---- Perbandingan dengan kelompok ----
+    if (g.pembanding && document.getElementById("grafik-banding")) {
+        new Chart(document.getElementById("grafik-banding"), {
+            type: "bar",
+            data: { labels: g.domain, datasets: [
+                Object.assign({ label: "Anak ini", data: g.terakhir }, SP.batang(SP.warnaDomain[0])),
+                Object.assign({ label: g.pembanding.label, data: g.pembanding.nilai }, SP.batang(SP.warnaDomain[1])),
+            ] },
+            options: {
+                indexAxis: "y", layout: { padding: { right: 48 } },
+                scales: { x: SP.skalaPersen(), y: SP.skalaKategori() },
+                plugins: { labelUjung: { aktif: true, hanya: 0 },
+                    tooltip: { callbacks: { label: function (c) { return c.dataset.label + ": " + SP.persen(c.raw); } } } },
+            },
+            plugins: [SP.labelUjung],
+        });
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}
